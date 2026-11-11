@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101a2b">
+<title>Chess Desk — игра против компьютера</title>
+<style>
+:root{--bg:#0b1423;--panel:#142238;--panel2:#0e1a2c;--line:#263a56;--gold:#e6bd70;--muted:#9eacc0;--light:#f0d9b5;--dark:#b58863}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at top,#1d3150 0,#0b1423 55%);color:#f5f7fb;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;min-height:100vh;padding:18px 12px 30px}
+.app{max-width:760px;margin:auto}
+header{display:flex;align-items:center;gap:13px;margin:4px 2px 16px}
+.logo{width:48px;height:48px;border-radius:15px;background:linear-gradient(145deg,#f5d58c,#bd8b3e);display:grid;place-items:center;color:#182235;font-size:31px;box-shadow:0 7px 22px #0005}
+h1{font-size:23px;line-height:1.1;margin:0 0 4px} .sub{font-size:13px;color:var(--muted)}
+.pill{margin-left:auto;border:1px solid #37634f;color:#9de0b5;border-radius:30px;padding:7px 11px;font-size:12px;white-space:nowrap}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px;align-items:start}
+.card{background:linear-gradient(160deg,#172840,#101c2f);border:1px solid var(--line);border-radius:20px;padding:13px;box-shadow:0 14px 35px #0004}
+.player{display:flex;align-items:center;gap:10px;padding:2px 3px 11px}
+.avatar{width:38px;height:38px;border-radius:12px;background:#263a56;display:grid;place-items:center;font-size:23px}
+.player b{display:block;font-size:14px}.player small{color:var(--muted);font-size:12px}
+.score{margin-left:auto;background:#0a1424;border:1px solid #263a56;border-radius:10px;padding:6px 9px;font-size:12px;color:#dce5f2}
+.board{display:grid;grid-template-columns:repeat(8,1fr);width:100%;aspect-ratio:1;border:5px solid #263850;border-radius:10px;overflow:hidden;box-shadow:0 5px 18px #0005;touch-action:manipulation}
+.square{border:0;padding:0;margin:0;position:relative;display:grid;place-items:center;min-width:0;aspect-ratio:1;cursor:pointer;font-family:"Segoe UI Symbol","DejaVu Sans",serif}
+.square.light{background:var(--light)}.square.dark{background:var(--dark)}
+.square.selected{box-shadow:inset 0 0 0 5px #facc15}
+.square.last:after{content:"";position:absolute;inset:0;background:#facc1545;pointer-events:none}
+.square.target:before{content:"";position:absolute;width:25%;height:25%;border-radius:50%;background:#176b3a99;z-index:1}
+.square.capture:before{content:"";position:absolute;inset:4%;border:5px solid #176b3a99;border-radius:50%;z-index:1}
+.piece{font-size:clamp(27px,8vw,59px);line-height:1;z-index:2;user-select:none;text-shadow:0 1px 2px #0004}
+.white-piece{color:#fffdf4;text-shadow:0 1px 2px #3d3329,0 0 1px #222}
+.black-piece{color:#171b22;text-shadow:0 1px 1px #fff8}
+.coord{position:absolute;font-size:10px;line-height:1;color:#302b25;z-index:3;pointer-events:none}
+.coord.rank{top:3px;left:4px}.coord.file{bottom:3px;right:4px}
+.status{margin-top:12px;background:#0d192a;border:1px solid #263a56;border-radius:13px;padding:11px 12px;display:flex;gap:9px;align-items:center;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#69c58d;flex:none}.status small{display:block;color:var(--muted);margin-top:3px}
+.controls{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+button.action{background:#253b58;color:#f5f7fb;border:1px solid #3a5272;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:650;cursor:pointer}
+button.action.primary{background:linear-gradient(135deg,#e8c47b,#bd914b);color:#172235;border:0}
+button.action:disabled{opacity:.4;cursor:not-allowed}
+.side{display:grid;gap:12px}
+.section-title{font-weight:700;font-size:14px;margin-bottom:9px}
+.move-list{min-height:130px;max-height:300px;overflow:auto;color:#d9e2ef;font-size:13px}
+.move-row{display:grid;grid-template-columns:28px 1fr 1fr;gap:5px;padding:5px 3px;border-bottom:1px solid #26364c}
+.move-row span:first-child{color:var(--muted)}
+.tip{font-size:12px;line-height:1.5;color:var(--muted)}
+.promotion{display:none;gap:7px;flex-wrap:wrap;margin-top:10px}.promotion.show{display:flex}
+.promotion button{font-size:22px;min-width:45px}
+@media(max-width:650px){body{padding:12px 9px 24px}.layout{grid-template-columns:1fr}.side{grid-template-columns:1fr 1fr}.card{padding:11px}.pill{font-size:11px;padding:6px 8px}.move-list{max-height:145px;min-height:90px}}
+@media(max-width:390px){.side{grid-template-columns:1fr}.piece{font-size:clamp(25px,8vw,38px)}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="logo">♞</div>
+  <div><h1>Chess Desk</h1><div class="sub">Шахматы против компьютера</div></div>
+  <div class="pill">● Компьютер онлайн</div>
+</header>
+
+<div class="layout">
+  <main class="card">
+    <div class="player">
+      <div class="avatar">🤖</div>
+      <div><b>Компьютер · чёрные</b><small id="computerState">Ожидает твоего хода</small></div>
+      <div class="score" id="blackScore">0 взятий</div>
+    </div>
+    <div class="board" id="board" aria-label="Шахматная доска"></div>
+    <div class="player" style="padding:11px 3px 0">
+      <div class="avatar">♙</div>
+      <div><b>Ты · белые</b><small id="humanState">Твой ход</small></div>
+      <div class="score" id="whiteScore">0 взятий</div>
+    </div>
+    <div class="status"><span class="dot" id="statusDot"></span><div><b id="statusText">Твой ход</b><small id="statusHint">Выбери фигуру, затем клетку для хода.</small></div></div>
+    <div class="promotion" id="promotion">
+      <button class="action" data-promo="q" aria-label="Ферзь">♕</button>
+      <button class="action" data-promo="r" aria-label="Ладья">♖</button>
+      <button class="action" data-promo="b" aria-label="Слон">♗</button>
+      <button class="action" data-promo="n" aria-label="Конь">♘</button>
+      <span class="tip">Выбери фигуру для превращения пешки</span>
+    </div>
+    <div class="controls">
+      <button class="action primary" id="newGame">Новая партия</button>
+      <button class="action" id="undo">Отменить ход</button>
+      <button class="action" id="flip">Перевернуть доску</button>
+    </div>
+  </main>
+
+  <aside class="side">
+    <section class="card">
+      <div class="section-title">История ходов</div>
+      <div class="move-list" id="moves">Партия ещё не началась.</div>
+    </section>
+    <section class="card">
+      <div class="section-title">О компьютере</div>
+      <div class="tip">Это простой соперник. Он умеет делать все легальные ходы, брать фигуры, ставить шах и иногда ошибается. Белыми играешь ты, чёрными — компьютер.</div>
+    </section>
+  </aside>
+</div>
+</div>
+
+<script type="module">
+import { Chess } from "https://esm.sh/chess.js@1.4.0";
+
+const chess = new Chess();
+const boardEl = document.getElementById("board");
+const movesEl = document.getElementById("moves");
+const statusText = document.getElementById("statusText");
+const statusHint = document.getElementById("statusHint");
+const computerState = document.getElementById("computerState");
+const humanState = document.getElementById("humanState");
+const promotionEl = document.getElementById("promotion");
+const glyph = {wk:"♔",wq:"♕",wr:"♖",wb:"♗",wn:"♘",wp:"♙",bk:"♚",bq:"♛",br:"♜",bb:"♝",bn:"♞",bp:"♟︎"};
+const value = {p:100,n:320,b:330,r:500,q:900,k:20000};
+let selected = null, legalTargets = [], flipped = false, thinking = false, gameOver = false;
+let pendingPromotion = null, lastMove = null, thinkingTimer = null;
+
+function squareName(file, rank){return "abcdefgh"[file]+rank;}
+function renderBoard(){
+  boardEl.innerHTML = "";
+  for(let row=0;row<8;row++){
+    for(let col=0;col<8;col++){
+      const file = flipped ? 7-col : col;
+      const rank = flipped ? row+1 : 8-row;
+      const name = squareName(file,rank);
+      const piece = chess.get(name);
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "square "+(((file+rank)%2===0)?"light":"dark");
+      if(selected===name) el.classList.add("selected");
+      if(lastMove && (lastMove.from===name||lastMove.to===name)) el.classList.add("last");
+      if(legalTargets.includes(name)) el.classList.add(piece?"capture":"target");
+      el.setAttribute("aria-label",name+(piece?" "+piece.color+piece.type:""));
+      if(piece){
+        const span=document.createElement("span");
+        span.className="piece "+(piece.color==="w"?"white-piece":"black-piece");
+        span.textContent=glyph[piece.color+piece.type];
+        el.appendChild(span);
+      }
+      if(col===0){const c=document.createElement("span");c.className="coord rank";c.textContent=rank;el.appendChild(c);}
+      if(row===7){const c=document.createElement("span");c.className="coord file";c.textContent="abcdefgh"[file];el.appendChild(c);}
+      el.addEventListener("click",()=>onSquare(name));
+      boardEl.appendChild(el);
+    }
+  }
+  renderMoves();
+  updateStatus();
+}
+function renderMoves(){
+  const history=chess.history();
+  if(!history.length){movesEl.textContent="Партия ещё не началась.";return;}
+  movesEl.innerHTML="";
+  for(let i=0;i<history.length;i+=2){
+    const row=document.createElement("div");row.className="move-row";
+    const n=document.createElement("span");n.textContent=(i/2+1)+".";
+    const w=document.createElement("span");w.textContent=history[i]||"";
+    const b=document.createElement("span");b.textContent=history[i+1]||"";
+    row.append(n,w,b);movesEl.appendChild(row);
+  }
+  movesEl.scrollTop=movesEl.scrollHeight;
+}
+function updateStatus(){
+  const captured=chess.history({verbose:true}).filter(m=>m.captured);
+  document.getElementById("whiteScore").textContent=captured.filter(m=>m.color==="b").length+" взятий";
+  document.getElementById("blackScore").textContent=captured.filter(m=>m.color==="w").length+" взятий";
+  const dot=document.getElementById("statusDot");
+  if(chess.isCheckmate()){
+    const winner=chess.turn()==="w"?"Компьютер победил":"Ты победил";
+    statusText.textContent="Мат! "+winner+".";statusHint.textContent="Нажми «Новая партия», чтобы сыграть ещё.";gameOver=true;
+  }else if(chess.isDraw()||chess.isStalemate()||chess.isThreefoldRepetition()||chess.isInsufficientMaterial()){
+    statusText.textContent="Ничья.";statusHint.textContent="Нажми «Новая партия», чтобы сыграть ещё.";gameOver=true;
+  }else if(thinking){
+    statusText.textContent="Компьютер думает…";statusHint.textContent="Сейчас ход чёрных.";computerState.textContent="Думает…";humanState.textContent="Ожидай хода компьютера";
+  }else if(chess.isCheck()){
+    statusText.textContent=(chess.turn()==="w"?"Тебе":"Компьютеру")+" шах!";
+    statusHint.textContent=chess.turn()==="w"?"Нужно убрать короля из-под шаха.":"Компьютер должен ответить на шах.";
+    computerState.textContent=chess.turn()==="b"?"Под шахом":"Ожидает твоего хода";
+    humanState.textContent=chess.turn()==="w"?"Под шахом":"Ожидай хода компьютера";
+  }else if(chess.turn()==="w"){
+    statusText.textContent="Твой ход";statusHint.textContent="Выбери белую фигуру, затем клетку для хода.";
+    computerState.textContent="Ожидает твоего хода";humanState.textContent="Твой ход";
+  }else{
+    statusText.textContent="Ход компьютера";statusHint.textContent="Компьютер выбирает ход.";
+  }
+  dot.style.background=thinking?"#e6bd70":(chess.isCheck()?"#ef7777":"#69c58d");
+  document.getElementById("undo").disabled=chess.history().length===0||thinking;
+}
+function onSquare(name){
+  if(thinking||gameOver||chess.turn()!=="w"||pendingPromotion)return;
+  const piece=chess.get(name);
+  if(selected && legalTargets.includes(name)){
+    const options=chess.moves({square:selected,verbose:true}).filter(m=>m.to===name);
+    const promote=options.find(m=>m.promotion);
+    if(promote){pendingPromotion={from:selected,to:name};promotionEl.classList.add("show");return;}
+    makeHumanMove(selected,name);return;
+  }
+  if(piece&&piece.color==="w"){
+    selected=name;
+    legalTargets=chess.moves({square:name,verbose:true}).map(m=>m.to);
+  }else{selected=null;legalTargets=[];}
+  renderBoard();
+}
+function makeHumanMove(from,to,promotion){
+  try{
+    const move=chess.move({from,to,...(promotion?{promotion}:{})});
+    if(move){lastMove={from:move.from,to:move.to};selected=null;legalTargets=[];pendingPromotion=null;promotionEl.classList.remove("show");renderBoard();if(!chess.isGameOver())scheduleComputer();}
+  }catch(e){selected=null;legalTargets=[];renderBoard();}
+}
+promotionEl.querySelectorAll("[data-promo]").forEach(btn=>btn.addEventListener("click",()=>{if(pendingPromotion)makeHumanMove(pendingPromotion.from,pendingPromotion.to,btn.dataset.promo);}));
+function evaluateForBlack(){
+  const board=chess.board();let score=0;
+  for(let r=0;r<8;r++)for(let f=0;f<8;f++){
+    const p=board[r][f];if(!p)continue;
+    const v=value[p.type]||0;
+    score+=(p.color==="b"?v:-v);
+    const center=(3.5-Math.abs(3.5-f))+(3.5-Math.abs(3.5-r));
+    if(p.type!=="k")score+=(p.color==="b"?1:-1)*center*2;
+  }
+  if(chess.isCheck())score+=(chess.turn()==="w"?35:-35);
+  return score;
+}
+function chooseComputerMove(){
+  const moves=chess.moves({verbose:true});
+  if(!moves.length)return null;
+  const scored=[];
+  for(const move of moves){
+    chess.move(move);
+    let score=evaluateForBlack();
+    if(chess.isCheckmate())score+=100000;
+    else if(chess.isCheck())score+=12;
+    // Small randomness keeps this beginner-level opponent from playing identically.
+    score+=(Math.random()-.5)*95;
+    chess.undo();
+    scored.push({move,score});
+  }
+  scored.sort((a,b)=>b.score-a.score);
+  const pool=scored.slice(0,Math.min(3,scored.length));
+  return pool[Math.floor(Math.random()*pool.length)].move;
+}
+function scheduleComputer(){
+  thinking=true;renderBoard();
+  thinkingTimer=setTimeout(()=>{
+    if(chess.turn()!=="b"||chess.isGameOver()){thinking=false;renderBoard();return;}
+    const move=chooseComputerMove();
+    if(move){const played=chess.move(move);lastMove={from:played.from,to:played.to};}
+    thinking=false;renderBoard();
+  },650);
+}
+document.getElementById("newGame").addEventListener("click",()=>{
+  clearTimeout(thinkingTimer);chess.reset();selected=null;legalTargets=[];flipped=false;thinking=false;gameOver=false;pendingPromotion=null;lastMove=null;promotionEl.classList.remove("show");renderBoard();
+});
+document.getElementById("undo").addEventListener("click",()=>{
+  if(thinking)return;
+  if(chess.history().length){chess.undo();if(chess.turn()==="b"&&chess.history().length)chess.undo();}
+  selected=null;legalTargets=[];gameOver=false;lastMove=null;
+  const hist=chess.history({verbose:true});if(hist.length){const m=hist[hist.length-1];lastMove={from:m.from,to:m.to};}
+  renderBoard();
+});
+document.getElementById("flip").addEventListener("click",()=>{flipped=!flipped;renderBoard();});
+renderBoard();
+</script>
+</body>
+</html>
